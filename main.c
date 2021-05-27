@@ -97,6 +97,7 @@ void TIM3_IRQHandler() {
 
         pot_timer_count += timer_delta;
         
+        // 3640 / 113 ~= 32
         if (pot_timer_count % 32 == 0) {
             enc_timer_count += timer_delta;
             if (timer_delta == 1) {

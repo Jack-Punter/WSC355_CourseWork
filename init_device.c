@@ -20,15 +20,14 @@ void init_gpio(void) {
     //GPIOA->PUPDR  |= 0x0000000A;
 }
 
-/* Timer Configuration: Derivation of PSC and ARR registers for 226hz timer
- *       Time = 1/226   Sysclk = 8Mhz
+/* Timer Configuration: Derivation of PSC and ARR registers for 7280hz timer
+ *      Time = 1/7280   Sysclk = 8Mhz
  *               Time = (PSC + 1) / Sysclk * (ARR + 1)
  *      Time * Sysclk = (PSC + 1)(ARR + 1)
- *              35398 = (PSC + 1)(ARR + 1)
- *                PSC = 1608
- *     35398 / (1609) = ARR + 1 = 22
- *           ARR = 22 - 1 = 21
- *         PSC = 1608   ARR=21
+ *                PSC = 60
+ * (Time * Sysclk) / (61) = ARR + 1 = 18
+ *           ARR = 18 - 1 = 17
+ *         PSC = 60   ARR=17
  */
 void init_timer(void) {
     // Enable clock to timer 3
