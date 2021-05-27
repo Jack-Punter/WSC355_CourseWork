@@ -4,74 +4,140 @@
 #include "common.h"
 #include "init_device.h"
 
+#define CLOCK_WISE_EMULATION 1
+
+// This value will hold the encoder_device state in
+// the lest significant 2 bits.
+
+#define ENC_C_MASK   0x3
+#define ENC_CA       0x1
+#define ENC_CB       0x2
+// The encoder state emulated by the user button ISR
+volatile uint8_t encoder_device;
+// The encoder state read
+volatile uint8_t encoder_state;
+volatile uint8_t encoder_counter;
 
 //~ Program (main)
 int main(void) {
     init_gpio();
-    //init_timer();
-    //init_dac();
-    //init_adc();
-    //init_opamp();
-    init_pwm_timer();
     init_exti_interrupts();
     
     //-Main program loop
     // Display the ADC value on the LEDs
-    volatile uint8_t adc_value = 0;
     while (1) {
-        ADC1->CR |= ADC_CR_ADSTART;
-        
-        // Wait until the 'end of conversion', EOC,  bit is set in the ISR register
-        // while((ADC1->ISR & ADC_ISR_EOC) == 0))
-        WAIT_FOR_BIT_SET(ADC1->ISR, ADC_ISR_EOC);
-        
-        //adc_value = ADC1->DR;
-        // Display the ADC value on the LEDs
-        
-        //GPIOE->BSRRH = (uint16_t)(~adc_value << 8);
-        //GPIOE->BSRRL = (uint16_t)(adc_value << 8);
+        // Clear the LEDs that are not part of the 4-bit count
+        GPIOE->BSRRH = ((~encoder_counter) & 0xF) << 11;
+        // Set the LEDs that are in the 4bit count
+        GPIOE->BSRRL = (encoder_counter & 0xF) << 11;
     }
 }
 
 //~ Interrupt Service Routines
-/*
- We are only using 8 bits 0-255
- The DAC uses a 12-bit input meaning we can use values 0-4095
- The DAC's output is linear from 0-3.3v, therefore
- the maximum output using 8 bits = 255 / 4095 * 3.3v which is approx 0.2v
-*/
-
-volatile uint8_t count;
-void TIM3_IRQHandler() {
-    // If the interrupt source is a timer 'Update' interrupt
-    if ((TIM3->SR & TIM_SR_UIF) == TIM_SR_UIF) {
-        count++;
+void encoder_device_counterclockwise() {
+    // Emulate Clockwise rotation of the encoder_device
+    switch (encoder_device & ENC_C_MASK) {
+        case 0x0: {
+            encoder_device = 0x2;
+        } break;
         
-        // Write count to the DAC
-        // (This will act as a sawtooth wave)
-        // DAC1->DHR12R2 = count;
+        case 0x1: {
+            encoder_device = 0x0;
+        } break;
         
-        // Reset the Update interrupt flag in the status register
-        TIM3->SR &= ~TIM_SR_UIF;
+        case 0x2: {
+            encoder_device = 0x3;
+        } break;
+        
+        case 0x3: {
+            encoder_device = 0x1;
+        } break;
     }
 }
 
-const uint16_t PWM_Cycle[] = {
-    0,    // 0%
-    250,  // 25%
-    500,  // 50%
-    750,  // 75%
-    1000, // 100%
-};
+void encoder_device_clockwise() {
+    // Emulate Anti-Clockwise rotation of the encoder_device
+    switch (encoder_device & ENC_C_MASK) {
+        case 0x0: {
+            encoder_device = 0x1;
+        } break;
+        
+        case 0x1: {
+            encoder_device = 0x3;
+        } break;
+        
+        case 0x2: {
+            encoder_device = 0x0;
+        } break;
+        
+        case 0x3: {
+            encoder_device = 0x2;
+        } break;
+    }
+}
+
 void EXTI0_IRQHandler() {
-    // Check the IRQ source
+    // Check the IRQ source is the USR button
     if (EXTI->PR & EXTI_PR_PR0) {
         // Clear the pending IRQ bit 
         // this is a wc_w1 register meaning we write 1 to clear the bit.
         EXTI->PR |= EXTI_PR_PR0;
-        
-        count++;
-        TIM1->CCR1 = PWM_Cycle[count % ArrayCount(PWM_Cycle)];
+
+#if CLOCK_WISE_EMULATION
+        encoder_device_clockwise();
+#else
+        encoder_device_counterclockwise();
+#endif
+        // Output the encoder_device state on PE.8 and PE.9
+        GPIOE->BSRRH = (~encoder_device & 0x3) << 8;
+        GPIOE->BSRRL = (encoder_device & 0x3) << 8;
     }
 }
 
+/*
+ * encoder_device Channel A: PE.8 -> PA.1
+ * encoder_device Channel B: PE.9 -> PA.3
+ */
+void EXTI1_IRQHandler() {
+    // Triggers when encoder_device channel A changes
+    // if the interrupt source is PA.1
+    if (EXTI->PR & EXTI_PR_PR1) {
+        // Clear the pending IRQ bit 
+        EXTI->PR |= EXTI_PR_PR1;
+        
+        // If the previous state was 0b00 or 0b11
+        if ((encoder_state & ENC_C_MASK) == 0x0 ||
+            (encoder_state & ENC_C_MASK) == 0x3) {
+            encoder_counter++;
+        } else {
+            encoder_counter--;
+        }
+        // Clear the previous state of the encoder channels
+        encoder_state &= ~(ENC_C_MASK);
+        // Write the new state of the encoder channels
+        encoder_state |= encoder_device & ENC_C_MASK;
+    }
+}
+
+void EXTI3_IRQHandler() {
+    // Triggers when encoder_device channel B changes
+    
+    // if the interrupt source is PA.3
+    if (EXTI->PR & EXTI_PR_PR3) {
+        // Clear the pending IRQ bit 
+        EXTI->PR |= EXTI_PR_PR3;
+
+        // If the previous state was 0b00 or 0b11
+        if ((encoder_state & ENC_C_MASK) == 0x0 ||
+            (encoder_state & ENC_C_MASK) == 0x3) {
+            encoder_counter--;
+        } else {
+            encoder_counter++;
+        }
+        
+        // Clear the previous state of the encoder channels
+        encoder_state &= ~(ENC_C_MASK);
+        // Write the new state of the encoder channels
+        encoder_state |= encoder_device & ENC_C_MASK;
+    }
+}
