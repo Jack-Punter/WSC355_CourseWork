@@ -9,6 +9,8 @@ void init_dac(void);
 void init_adc(void);
 void init_opamp(void);
 void init_pwm_timer(void);
+void init_exti_interrupts(void);
+
 
 #define INIT_DEVICE_H
 #endif

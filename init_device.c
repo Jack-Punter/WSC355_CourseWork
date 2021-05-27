@@ -4,10 +4,13 @@
 // GPIO Configuration
 void init_gpio(void) {
     // Enable clock on GPIO port A and E
-    RCC->AHBENR |= RCC_AHBENR_GPIOEEN;
+    RCC->AHBENR |= RCC_AHBENR_GPIOAEN| RCC_AHBENR_GPIOEEN;
     
-    // set E.9,11 & 13 to Alternative funcition mode for PWM
-    GPIOE->MODER  |= 0x08880000;
+    // No changes need to be made to the GPIOA MODER register
+    // as the reset state for PA.0 is Input mode
+    
+    // set E.15 to output and E.9,11 & 13 to Alternative funcition mode for PWM
+    GPIOE->MODER  |= 0x48880000;
     // Set the Alternative function of E.9, 11 & 13 to AF2
     // TIM_CH1, TIM_CH2 & TIM_CH3 respectively
     GPIOE->AFR[1] |= 0x00202020;
@@ -152,4 +155,24 @@ void init_pwm_timer(void) {
     
     // Enable the timer
     TIM1->CR1 |= TIM_CR1_CEN;
+}
+
+void init_exti_interrupts(void) {
+    // GPIOA Enabled in the init_gpio function
+    
+    // Enable the clock connection to the interrupt controller
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    
+    // Enable an interrupt to be generated using the EXTI_IMR register
+    // Unmask EXTI0
+    EXTI->IMR |= EXTI_IMR_MR0;
+    
+    // Set trigger to be rising edge
+    EXTI->RTSR |= EXTI_RTSR_TR0;
+    
+    // Configure multiplexing to set PA.0 to generate an interrupt EXTI0;
+    SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PA;
+    
+    // enable the IRQ
+    NVIC_EnableIRQ(EXTI0_IRQn);
 }

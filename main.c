@@ -13,6 +13,7 @@ int main(void) {
     //init_adc();
     //init_opamp();
     init_pwm_timer();
+    init_exti_interrupts();
     
     //-Main program loop
     // Display the ADC value on the LEDs
@@ -51,7 +52,19 @@ void TIM3_IRQHandler() {
         // DAC1->DHR12R2 = count;
         
         // Reset the Update interrupt flag in the status register
-        // TIM3->SR &= ~TIM_SR_UIF;
+        TIM3->SR &= ~TIM_SR_UIF;
+    }
+}
+
+void EXTI0_IRQHandler() {
+    // Check the IRQ source
+    if (EXTI->PR & EXTI_PR_PR0) {
+        // Clear the pending IRQ bit 
+        // this is a wc_w1 register meaning we write 1 to clear the bit.
+        EXTI->PR |= EXTI_PR_PR0;
+        
+        // Turn on the last LED to validate the ISR is being run
+        GPIOE->BSRRL |= 0x8000;
     }
 }
 
