@@ -10,7 +10,7 @@ void init_gpio(void) {
     // as the reset state for PA.0 is Input mode
     
     // set E.15 to output and E.9,11 & 13 to Alternative funcition mode for PWM
-    GPIOE->MODER  |= 0x48880000;
+    GPIOE->MODER  |= 0x08880000;
     // Set the Alternative function of E.9, 11 & 13 to AF2
     // TIM_CH1, TIM_CH2 & TIM_CH3 respectively
     GPIOE->AFR[1] |= 0x00202020;

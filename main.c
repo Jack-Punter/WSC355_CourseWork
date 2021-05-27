@@ -56,6 +56,13 @@ void TIM3_IRQHandler() {
     }
 }
 
+const uint16_t PWM_Cycle[] = {
+    0,    // 0%
+    250,  // 25%
+    500,  // 50%
+    750,  // 75%
+    1000, // 100%
+};
 void EXTI0_IRQHandler() {
     // Check the IRQ source
     if (EXTI->PR & EXTI_PR_PR0) {
@@ -63,8 +70,8 @@ void EXTI0_IRQHandler() {
         // this is a wc_w1 register meaning we write 1 to clear the bit.
         EXTI->PR |= EXTI_PR_PR0;
         
-        // Turn on the last LED to validate the ISR is being run
-        GPIOE->BSRRL |= 0x8000;
+        count++;
+        TIM1->CCR1 = PWM_Cycle[count % ArrayCount(PWM_Cycle)];
     }
 }
 
